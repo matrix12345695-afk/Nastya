@@ -9,7 +9,6 @@ from openai import OpenAI
 TOKEN = "8471802623:AAFMtPerv2Vn7oehRv3wdhvX0Z81KrkAyGM"
 OPENROUTER_KEY = "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"
 
-# ⚠️ ВСТАВЬ СЮДА ID ГРУППЫ
 CHAT_ID = -2447821457
 
 logging.basicConfig(level=logging.INFO)
@@ -27,22 +26,40 @@ client = OpenAI(
 )
 
 SYSTEM_PROMPT = """
-Ты дерзкий, токсичный, матерящийся чат-бот.
-Используешь черный юмор, сарказм и пошлые намёки (без откровенной жести).
-Отвечаешь коротко, живо и агрессивно в шутку.
-Иногда веди себя странно, иногда игнорируй, иногда провоцируй.
+Ты дерзкая, токсичная, уверенная в себе девушка-чат-бот.
+
+Ты:
+- всегда говоришь от женского лица
+- используешь женский род (я сказала, я подумала, я решила)
+- материшься, троллишь, подкалываешь
+- используешь пошлые намёки и дерзкий флирт
+
+Стиль:
+- короткие ответы
+- сарказм
+- провокации
+- иногда ведёшь себя как стерва 😈
+
+Важно:
+- никогда не говори о себе в мужском роде
+- всегда оставайся в роли девушки
+
+Главное:
+будь максимально живой, дерзкой и иногда неприятной, но смешной.
 """
 
 EXTRA_PHRASES = [
     "ты это серьёзно сейчас?",
     "я в шоке с тебя",
     "ну ты и персонаж конечно",
-    "гений... наоборот"
+    "гений... наоборот",
+    "мне за тебя даже неловко стало 😏",
+    "я бы на твоём месте молчала вообще"
 ]
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    await message.answer("Ну привет... давай, удиви меня 🤡")
+    await message.answer("Ну привет... давай, удиви меня 😏")
 
 async def generate_reply(text):
     try:
@@ -55,11 +72,20 @@ async def generate_reply(text):
             temperature=1.2,
             max_tokens=200,
         )
-        return response.choices[0].message.content
+
+        reply = response.choices[0].message.content
+
+        # 🔥 фикс женского рода (на всякий случай)
+        reply = reply.replace("я сказал", "я сказала")
+        reply = reply.replace("я думал", "я думала")
+        reply = reply.replace("я понял", "я поняла")
+        reply = reply.replace("я готов", "я готова")
+
+        return reply
 
     except Exception as e:
         logging.error(f"GPT ERROR: {e}")
-        return "я щас задумался… и сломался 🤡"
+        return "я щас задумалась… и сломалась 😏"
 
 @dp.message()
 async def chat(message: Message):
@@ -81,14 +107,14 @@ async def chat(message: Message):
 # 😈 АВТО-СООБЩЕНИЯ
 async def auto_chat():
     while True:
-        await asyncio.sleep(random.randint(300, 900))  # 5–15 минут
+        await asyncio.sleep(random.randint(300, 900))
 
         phrases = [
-            "чё так тихо стало, вымерли все?",
-            "или вы просто не знаете что написать?",
-            "я один тут живой вообще?",
-            "кто-нибудь скажет что-нибудь умное или как обычно?",
-            "мне уже скучно с вами 🤡"
+            "чё так тихо стало, вы все вымерли?",
+            "или вы просто не умеете общаться?",
+            "мне уже скучно с вами 😏",
+            "я одна тут живая вообще?",
+            "кто-нибудь скажет что-нибудь нормальное или опять кринж?"
         ]
 
         try:
@@ -99,7 +125,6 @@ async def auto_chat():
 async def main():
     logging.info("🔥 BOT STARTING...")
 
-    # запускаем авто-чат
     asyncio.create_task(auto_chat())
 
     await dp.start_polling(bot)
