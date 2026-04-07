@@ -53,6 +53,20 @@ async def start(message: Message):
     await message.answer("Ну привет... давай, удиви меня 😏")
 
 
+# 🔥 ПРОВЕРКА AI
+async def check_ai():
+    try:
+        client.chat.completions.create(
+            model="meta-llama/llama-3-70b-instruct",
+            messages=[{"role": "user", "content": "Ответь: ок"}],
+            max_tokens=5,
+        )
+        return True
+    except Exception as e:
+        logging.error(f"AI CHECK ERROR: {e}")
+        return False
+
+
 # 🔥 УМНЫЙ AI
 async def generate_reply(user_id, text):
     try:
@@ -75,7 +89,6 @@ async def generate_reply(user_id, text):
         history.append({"role": "assistant", "content": reply})
         user_memory[user_id] = history
 
-        # фикс рода
         reply = reply.replace("я сказал", "я сказала")
         reply = reply.replace("я думал", "я думала")
 
@@ -100,14 +113,12 @@ async def chat(message: Message):
 
     user_id = message.from_user.id
 
-    # активность
     if user_id not in user_stats:
         user_stats[user_id] = {"messages": 0}
 
     user_stats[user_id]["messages"] += 1
     activity = user_stats[user_id]["messages"]
 
-    # шанс ответа
     chance = 80 if activity < 5 else 95
 
     if random.randint(1, 100) > chance:
@@ -118,7 +129,6 @@ async def chat(message: Message):
     reply = await generate_reply(user_id, message.text)
     reply = f"{username}, {reply}"
 
-    # лёгкий троллинг
     target_id = get_target_user()
     if target_id == user_id and random.randint(1, 100) < 30:
         reply += "\n\nты слишком часто пишешь… я уже наблюдаю 😏"
@@ -145,12 +155,37 @@ async def auto_chat():
             logging.error(f"AUTO CHAT ERROR: {e}")
 
 
+# 🔥 уведомление о статусе AI
+async def ai_status_notify():
+    while True:
+        await asyncio.sleep(1800)  # каждые 30 минут
+
+        status = await check_ai()
+
+        try:
+            if status:
+                await bot.send_message(CHAT_ID, "🟢 я жива, мозги работают 😏")
+            else:
+                await bot.send_message(CHAT_ID, "🔴 я сломалась… не тупите пока без меня 😒")
+        except Exception as e:
+            logging.error(f"STATUS ERROR: {e}")
+
+
 async def main():
     logging.info("🔥 BOT STARTING...")
 
     await bot.delete_webhook(drop_pending_updates=True)
 
+    # 🔥 проверка при старте
+    status = await check_ai()
+
+    if status:
+        await bot.send_message(CHAT_ID, "🟢 я запустилась и готова разносить чат 😈")
+    else:
+        await bot.send_message(CHAT_ID, "🔴 я запустилась, но мозги не работают 😒")
+
     asyncio.create_task(auto_chat())
+    asyncio.create_task(ai_status_notify())
 
     await dp.start_polling(bot)
 
