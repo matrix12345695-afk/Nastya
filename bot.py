@@ -7,7 +7,7 @@ from aiogram.filters import CommandStart
 from openai import OpenAI
 
 TOKEN = "8471802623:AAFMtPerv2Vn7oehRv3wdhvX0Z81KrkAyGM"
-OPENROUTER_KEY = "sk-or-v1-..."
+OPENROUTER_KEY = "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"
 
 CHAT_ID = -2447821457
 
@@ -31,33 +31,37 @@ user_memory = {}
 # 📊 АКТИВНОСТЬ
 user_stats = {}
 
+# 🔥 НОВЫЙ ПРОМПТ (ключ)
 SYSTEM_PROMPT = """
-Ты умная, дерзкая девушка.
+Ты живая, умная девушка в чате.
 
 Ты:
-- понимаешь контекст
-- отвечаешь логично и по делу
-- если вопрос тупой — подкалываешь
-- если нормальный — отвечаешь нормально
+- говоришь естественно, как человек
+- отвечаешь развернуто, но без воды
+- понимаешь смысл, а не просто реагируешь
+- иногда задаёшь встречные вопросы
+- можешь слегка подколоть, но по делу
 
-НЕ:
-- не пиши шаблоны
+Важно:
+- не пиши короткие тупые ответы
+- не используй шаблоны
 - не повторяйся
-- не пиши банальности
+- не веди себя как бот
 
-Говори как живой человек.
+Твоя цель:
+сделать диалог живым и интересным, как будто ты реальный человек.
 """
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    await message.answer("Ну привет... давай, удиви меня 😏")
+    await message.answer("Ну привет... давай нормально поговорим 😏")
 
 
 # 🔥 ПРОВЕРКА AI
 async def check_ai():
     try:
         client.chat.completions.create(
-            model="meta-llama/llama-3-70b-instruct",
+            model="mistralai/mixtral-8x7b",
             messages=[{"role": "user", "content": "Ответь: ок"}],
             max_tokens=5,
         )
@@ -67,39 +71,56 @@ async def check_ai():
         return False
 
 
-# 🔥 УМНЫЙ AI
+# 🔥 УМНЫЙ AI С FALLBACK
 async def generate_reply(user_id, text):
     try:
         history = user_memory.get(user_id, [])
-
         history.append({"role": "user", "content": text})
 
-        response = client.chat.completions.create(
-            model="meta-llama/llama-3-70b-instruct",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                *history[-12:]
-            ],
-            temperature=0.9,
-            max_tokens=300,
-        )
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": "Сначала пойми смысл сообщения, потом ответь нормально."},
+            *history[-12:]
+        ]
+
+        try:
+            # 🔥 основная модель (умная)
+            response = client.chat.completions.create(
+                model="meta-llama/llama-3-70b-instruct",
+                messages=messages,
+                temperature=0.9,
+                max_tokens=500,
+            )
+        except:
+            # 💥 fallback (стабильная)
+            response = client.chat.completions.create(
+                model="mistralai/mixtral-8x7b",
+                messages=messages,
+                temperature=0.9,
+                max_tokens=300,
+            )
 
         reply = response.choices[0].message.content.strip()
 
         history.append({"role": "assistant", "content": reply})
         user_memory[user_id] = history
 
+        # женский род
         reply = reply.replace("я сказал", "я сказала")
         reply = reply.replace("я думал", "я думала")
+
+        # 🔥 добавляем “живость”
+        if "?" not in reply and random.randint(1, 100) < 40:
+            reply += "\n\nи вообще… ты это серьёзно сейчас или просто спросил?"
 
         return reply
 
     except Exception as e:
         logging.error(f"GPT ERROR: {e}")
-        return "блин, я зависла… повтори нормально 😒"
+        return "я щас подвисла… но не надолго 😒"
 
 
-# 🎯 цель (активный)
+# 🎯 цель
 def get_target_user():
     if not user_stats:
         return None
@@ -131,7 +152,7 @@ async def chat(message: Message):
 
     target_id = get_target_user()
     if target_id == user_id and random.randint(1, 100) < 30:
-        reply += "\n\nты слишком часто пишешь… я уже наблюдаю 😏"
+        reply += "\n\nты слишком часто пишешь… я уже начинаю запоминать 😏"
 
     await message.reply(reply)
 
@@ -142,11 +163,10 @@ async def auto_chat():
         await asyncio.sleep(random.randint(300, 900))
 
         phrases = [
-            "чё так тихо стало?",
-            "мне уже скучно с вами 😏",
-            "я одна тут думаю или как?",
-            "кто-нибудь вообще умеет нормально говорить?",
-            "или вы просто пишете ради шума?"
+            "мне кажется тут кто-то думает, но не до конца 😏",
+            "вы вообще разговаривать умеете или просто пишете?",
+            "чё так тихо, я одна тут живая?",
+            "кто-нибудь скажет что-то нормальное наконец?"
         ]
 
         try:
@@ -155,18 +175,18 @@ async def auto_chat():
             logging.error(f"AUTO CHAT ERROR: {e}")
 
 
-# 🔥 уведомление о статусе AI
+# 🔥 статус AI
 async def ai_status_notify():
     while True:
-        await asyncio.sleep(1800)  # каждые 30 минут
+        await asyncio.sleep(1800)
 
         status = await check_ai()
 
         try:
             if status:
-                await bot.send_message(CHAT_ID, "🟢 я жива, мозги работают 😏")
+                await bot.send_message(CHAT_ID, "🟢 я тут, всё думаю 😏")
             else:
-                await bot.send_message(CHAT_ID, "🔴 я сломалась… не тупите пока без меня 😒")
+                await bot.send_message(CHAT_ID, "🔴 я временно туплю… подождите 😒")
         except Exception as e:
             logging.error(f"STATUS ERROR: {e}")
 
@@ -176,13 +196,12 @@ async def main():
 
     await bot.delete_webhook(drop_pending_updates=True)
 
-    # 🔥 проверка при старте
     status = await check_ai()
 
     if status:
-        await bot.send_message(CHAT_ID, "🟢 я запустилась и готова разносить чат 😈")
+        await bot.send_message(CHAT_ID, "🟢 я вернулась, давайте нормально поговорим 😏")
     else:
-        await bot.send_message(CHAT_ID, "🔴 я запустилась, но мозги не работают 😒")
+        await bot.send_message(CHAT_ID, "🔴 я тут, но мозги что-то не грузятся 😒")
 
     asyncio.create_task(auto_chat())
     asyncio.create_task(ai_status_notify())
