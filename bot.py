@@ -25,8 +25,11 @@ client = OpenAI(
     }
 )
 
-# 🧠 ПАМЯТЬ
+# 🧠 ПАМЯТЬ ДИАЛОГА
 user_memory = {}
+
+# 📊 АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЕЙ
+user_stats = {}
 
 SYSTEM_PROMPT = """
 Ты дерзкая, умная, токсичная девушка.
@@ -76,7 +79,7 @@ async def generate_reply(user_id, text):
         history.append({"role": "assistant", "content": reply})
         user_memory[user_id] = history
 
-        # фиксим женский род
+        # фикс женского рода
         reply = reply.replace("я сказал", "я сказала")
         reply = reply.replace("я думал", "я думала")
 
@@ -87,21 +90,47 @@ async def generate_reply(user_id, text):
         return "я щас задумалась… и зависла 😏"
 
 
+# 🎯 выбираем самого активного
+def get_target_user():
+    if not user_stats:
+        return None
+    return max(user_stats, key=lambda x: user_stats[x]["messages"])
+
+
 @dp.message()
 async def chat(message: Message):
     if not message.text:
         return
 
-    if random.randint(1, 100) > 80:
+    user_id = message.from_user.id
+
+    # 📊 считаем активность
+    if user_id not in user_stats:
+        user_stats[user_id] = {"messages": 0}
+
+    user_stats[user_id]["messages"] += 1
+
+    activity = user_stats[user_id]["messages"]
+
+    # 🔥 активным отвечаем чаще
+    chance = 80 if activity < 5 else 95
+
+    if random.randint(1, 100) > chance:
         return
 
     username = message.from_user.first_name
 
-    reply = await generate_reply(message.from_user.id, message.text)
+    reply = await generate_reply(user_id, message.text)
 
     reply = f"{username}, {reply}"
 
-    # иногда добавляем токсичность
+    # 😈 лёгкий троллинг активных
+    target_id = get_target_user()
+
+    if target_id == user_id and random.randint(1, 100) < 40:
+        reply += "\n\nты слишком часто пишешь… мне уже интересно 😏"
+
+    # 💬 иногда добавляем токсичность
     if random.randint(1, 100) < 50:
         reply += "\n\n" + random.choice(EXTRA_PHRASES)
 
@@ -117,7 +146,8 @@ async def auto_chat():
             "чё так тихо стало?",
             "мне уже скучно с вами 😏",
             "я одна тут нормальная вообще?",
-            "кто-нибудь скажет что-то умное или как обычно?"
+            "кто-нибудь скажет что-то умное или как обычно?",
+            "или вы просто пишете ради шума?"
         ]
 
         try:
@@ -128,6 +158,8 @@ async def auto_chat():
 
 async def main():
     logging.info("🔥 BOT STARTING...")
+
+    await bot.delete_webhook(drop_pending_updates=True)
 
     asyncio.create_task(auto_chat())
 
