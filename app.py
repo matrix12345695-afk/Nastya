@@ -12,7 +12,7 @@ def home():
 def ping():
     while True:
         try:
-            requests.get("https://YOUR-RENDER-URL.onrender.com")
+            requests.get("https://nastya-cxkb.onrender.com")
         except:
             pass
         time.sleep(300)
