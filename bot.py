@@ -25,39 +25,35 @@ client = OpenAI(
     }
 )
 
-# 🧠 ПАМЯТЬ ДИАЛОГА
+# 🧠 ПАМЯТЬ
 user_memory = {}
 
-# 📊 АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЕЙ
+# 📊 АКТИВНОСТЬ
 user_stats = {}
 
 SYSTEM_PROMPT = """
-Ты дерзкая, умная, токсичная девушка.
+Ты умная, дерзкая девушка.
 
 Ты:
-- понимаешь контекст разговора
-- отвечаешь логично
-- умеешь подколоть, но не тупишь
-- иногда саркастичная, но не бессмысленная
+- понимаешь контекст
+- отвечаешь логично и по делу
+- если вопрос тупой — подкалываешь
+- если нормальный — отвечаешь нормально
 
-Важно:
-- всегда говори от женского лица
+НЕ:
+- не пиши шаблоны
+- не повторяйся
 - не пиши банальности
-"""
 
-EXTRA_PHRASES = [
-    "ты это серьёзно сейчас?",
-    "я в шоке с тебя",
-    "ну ты и персонаж конечно",
-    "гений... наоборот",
-]
+Говори как живой человек.
+"""
 
 @dp.message(CommandStart())
 async def start(message: Message):
     await message.answer("Ну привет... давай, удиви меня 😏")
 
 
-# 🔥 УМНЫЙ ОТВЕТ С ПАМЯТЬЮ
+# 🔥 УМНЫЙ AI
 async def generate_reply(user_id, text):
     try:
         history = user_memory.get(user_id, [])
@@ -65,21 +61,21 @@ async def generate_reply(user_id, text):
         history.append({"role": "user", "content": text})
 
         response = client.chat.completions.create(
-            model="nousresearch/nous-hermes-2",
+            model="meta-llama/llama-3-70b-instruct",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                *history[-6:]
+                *history[-12:]
             ],
-            temperature=1.1,
-            max_tokens=200,
+            temperature=0.9,
+            max_tokens=300,
         )
 
-        reply = response.choices[0].message.content
+        reply = response.choices[0].message.content.strip()
 
         history.append({"role": "assistant", "content": reply})
         user_memory[user_id] = history
 
-        # фикс женского рода
+        # фикс рода
         reply = reply.replace("я сказал", "я сказала")
         reply = reply.replace("я думал", "я думала")
 
@@ -87,10 +83,10 @@ async def generate_reply(user_id, text):
 
     except Exception as e:
         logging.error(f"GPT ERROR: {e}")
-        return "я щас задумалась… и зависла 😏"
+        return "блин, я зависла… повтори нормально 😒"
 
 
-# 🎯 выбираем самого активного
+# 🎯 цель (активный)
 def get_target_user():
     if not user_stats:
         return None
@@ -104,15 +100,14 @@ async def chat(message: Message):
 
     user_id = message.from_user.id
 
-    # 📊 считаем активность
+    # активность
     if user_id not in user_stats:
         user_stats[user_id] = {"messages": 0}
 
     user_stats[user_id]["messages"] += 1
-
     activity = user_stats[user_id]["messages"]
 
-    # 🔥 активным отвечаем чаще
+    # шанс ответа
     chance = 80 if activity < 5 else 95
 
     if random.randint(1, 100) > chance:
@@ -121,23 +116,17 @@ async def chat(message: Message):
     username = message.from_user.first_name
 
     reply = await generate_reply(user_id, message.text)
-
     reply = f"{username}, {reply}"
 
-    # 😈 лёгкий троллинг активных
+    # лёгкий троллинг
     target_id = get_target_user()
-
-    if target_id == user_id and random.randint(1, 100) < 40:
-        reply += "\n\nты слишком часто пишешь… мне уже интересно 😏"
-
-    # 💬 иногда добавляем токсичность
-    if random.randint(1, 100) < 50:
-        reply += "\n\n" + random.choice(EXTRA_PHRASES)
+    if target_id == user_id and random.randint(1, 100) < 30:
+        reply += "\n\nты слишком часто пишешь… я уже наблюдаю 😏"
 
     await message.reply(reply)
 
 
-# 😈 АВТО-ЧАТ
+# 😈 авто-чат
 async def auto_chat():
     while True:
         await asyncio.sleep(random.randint(300, 900))
@@ -145,8 +134,8 @@ async def auto_chat():
         phrases = [
             "чё так тихо стало?",
             "мне уже скучно с вами 😏",
-            "я одна тут нормальная вообще?",
-            "кто-нибудь скажет что-то умное или как обычно?",
+            "я одна тут думаю или как?",
+            "кто-нибудь вообще умеет нормально говорить?",
             "или вы просто пишете ради шума?"
         ]
 
