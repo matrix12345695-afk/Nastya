@@ -29,6 +29,12 @@ client = OpenAI(
 user_memory = {}
 flirt_level = {}
 
+# 🚫 СПИСОК ТЕХ КОГО ШЛЁМ
+TARGET_USERS = [
+    8276937335,  # сюда вставь user_id
+    785245733,
+]
+
 SYSTEM_BASE = """
 Ты Настя.
 
@@ -38,7 +44,7 @@ SYSTEM_BASE = """
 - флиртуешь
 - иногда подкалываешь
 
-Пиши как живая девушка, коротко и с эмоциями.
+Пиши как живая девушка.
 """
 
 FALLBACK = [
@@ -80,9 +86,7 @@ async def generate_reply(user_id, text, name):
 
         response = client.chat.completions.create(
             model="meta-llama/llama-3-8b-instruct:free",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.9,
             max_tokens=200,
         )
@@ -102,6 +106,12 @@ async def chat(message: Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
+    # 💣 ЖЁСТКАЯ ЛОГИКА
+    if user_id in TARGET_USERS:
+        await message.reply("ПОШЁЛ НА ХУЙ")
+        return
+
+    # 🎭 обычное поведение
     if random.randint(1, 100) > 75:
         return
 
