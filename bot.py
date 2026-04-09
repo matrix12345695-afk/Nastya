@@ -25,7 +25,7 @@ TARGET_USERS = [
 ]
 
 # 💣 ТЕКСТ ОТВЕТА (ВПИШИ ЧТО ХОЧЕШЬ)
-TARGET_REPLY = "НАПИШИ ТУТ СВОЙ ТЕКСТ"
+TARGET_REPLY = "ПОШЁЛ НА ХУЙ !!"
 
 
 @dp.message(CommandStart())
