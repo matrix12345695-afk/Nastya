@@ -213,3 +213,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    @dp.message()
+async def debug(message: Message):
+    print("CHAT ID:", message.chat.id)
