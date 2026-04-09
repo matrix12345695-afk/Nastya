@@ -6,8 +6,10 @@ from aiogram.types import Message
 from aiogram.filters import CommandStart
 from openai import OpenAI
 
-TOKEN = "8471802623:AAFMtPerv2Vn7oehRv3wdhvX0Z81KrkAyGM"
-OPENROUTER_KEY = "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"
+import os
+
+TOKEN = os.getenv("TOKEN")
+OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
 
 CHAT_ID = -2447821457
 
