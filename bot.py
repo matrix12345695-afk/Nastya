@@ -25,6 +25,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 user_memory = {}
 user_stats = {}
+flirt_level = {}
 
 SYSTEM_PROMPT = """
 Ты Настя.
@@ -41,9 +42,9 @@ SYSTEM_PROMPT = """
 """
 
 FALLBACK_PHRASES = [
-    "я сейчас не в настроении отвечать 😏",
+    "ты меня отвлёк… продолжай 😏",
     "подожди… я думаю 😈",
-    "ты меня немного грузишь сейчас 😒",
+    "мм… ты любишь настойчивых? 💋",
 ]
 
 
@@ -52,18 +53,52 @@ async def start(message: Message):
     await message.answer("ну привет… неужели решил написать? 😏")
 
 
-async def generate_reply(user_id, text):
+# 💋 ФЛИРТ-ГЕНЕРАЦИЯ
+async def generate_reply(user_id, text, name):
     try:
         history = user_memory.get(user_id, [])
+
+        # 💋 уровень флирта
+        if user_id not in flirt_level:
+            flirt_level[user_id] = 0
+
+        flirt_level[user_id] += 1
+        level = flirt_level[user_id]
+
+        # 🎭 режим
+        if level < 3:
+            mood = "легкий флирт"
+        elif level < 7:
+            mood = "активный флирт"
+        else:
+            mood = "дерзкий флирт"
+
+        prompt = f"""
+Ты Настя.
+
+Текущий режим: {mood}
+
+Общайся с пользователем по имени {name}.
+
+Поведение:
+- флиртуй
+- иногда подшучивай
+- иногда провоцируй
+- не будь слишком доступной
+- говори как живая девушка
+
+Не пиши как бот.
+"""
+
         history.append({"role": "user", "content": text})
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": prompt},
                 *history[-10:]
             ],
-            temperature=0.9,
+            temperature=1.0,
             max_tokens=300,
         )
 
@@ -85,6 +120,7 @@ async def chat(message: Message):
         return
 
     user_id = message.from_user.id
+    name = message.from_user.first_name
 
     if user_id not in user_stats:
         user_stats[user_id] = {"messages": 0}
@@ -95,16 +131,18 @@ async def chat(message: Message):
     if random.randint(1, 100) > 80:
         return
 
-    reply = await generate_reply(user_id, message.text)
+    reply = await generate_reply(user_id, message.text, name)
 
-    reply = f"{message.from_user.first_name}, {reply}"
+    reply = f"{name}, {reply}"
 
+    # 😈 доп подкол
     if random.randint(1, 100) < 30:
         reply += "\n\nты вообще всегда такой? 😏"
 
     await message.reply(reply)
 
 
+# 😈 авто чат
 async def auto_chat():
     while True:
         await asyncio.sleep(random.randint(300, 900))
@@ -113,6 +151,7 @@ async def auto_chat():
             "чё притихли… 😈",
             "мне скучно уже",
             "кто живой?",
+            "я тут одна вообще или как? 😏",
         ]
 
         try:
