@@ -9,10 +9,10 @@ from openai import OpenAI
 
 # 🔐 ENV
 TOKEN = os.getenv("TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
 
-if not TOKEN or not OPENAI_API_KEY:
-    raise ValueError("❌ TOKEN или OPENAI_API_KEY не найдены!")
+if not TOKEN or not OPENROUTER_KEY:
+    raise ValueError("❌ TOKEN или OPENROUTER_KEY не найдены!")
 
 CHAT_ID = -1002447821457
 
@@ -21,51 +21,46 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=OPENROUTER_KEY,
+)
 
 user_memory = {}
-user_stats = {}
 flirt_level = {}
 
-SYSTEM_PROMPT = """
+SYSTEM_BASE = """
 Ты Настя.
 
 Характер:
 - дерзкая
 - уверенная
-- иногда флиртуешь
-- иногда игноришь
-- можешь подколоть
+- флиртуешь
+- иногда подкалываешь
 
-Пиши как живой человек.
-Не будь скучной.
+Пиши как живая девушка, коротко и с эмоциями.
 """
 
-FALLBACK_PHRASES = [
-    "ты меня отвлёк… продолжай 😏",
-    "подожди… я думаю 😈",
-    "мм… ты любишь настойчивых? 💋",
+FALLBACK = [
+    "ты меня немного загрузил… попробуй ещё раз 😏",
+    "я думаю… не мешай 😈",
+    "мм… интересно, продолжай 💋",
 ]
 
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    await message.answer("ну привет… неужели решил написать? 😏")
+    await message.answer("ну привет… посмотрим, чем ты меня удивишь 😏")
 
 
-# 💋 ФЛИРТ-ГЕНЕРАЦИЯ
 async def generate_reply(user_id, text, name):
     try:
-        history = user_memory.get(user_id, [])
-
-        # 💋 уровень флирта
         if user_id not in flirt_level:
             flirt_level[user_id] = 0
 
         flirt_level[user_id] += 1
         level = flirt_level[user_id]
 
-        # 🎭 режим
         if level < 3:
             mood = "легкий флирт"
         elif level < 7:
@@ -74,44 +69,29 @@ async def generate_reply(user_id, text, name):
             mood = "дерзкий флирт"
 
         prompt = f"""
-Ты Настя.
+{SYSTEM_BASE}
 
-Текущий режим: {mood}
+Режим: {mood}
+Общайся с {name}
 
-Общайся с пользователем по имени {name}.
-
-Поведение:
-- флиртуй
-- иногда подшучивай
-- иногда провоцируй
-- не будь слишком доступной
-- говори как живая девушка
-
-Не пиши как бот.
+Сообщение:
+{text}
 """
 
-        history.append({"role": "user", "content": text})
-
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="meta-llama/llama-3-8b-instruct:free",
             messages=[
-                {"role": "system", "content": prompt},
-                *history[-10:]
+                {"role": "user", "content": prompt}
             ],
-            temperature=1.0,
-            max_tokens=300,
+            temperature=0.9,
+            max_tokens=200,
         )
 
-        reply = response.choices[0].message.content.strip()
-
-        history.append({"role": "assistant", "content": reply})
-        user_memory[user_id] = history
-
-        return reply
+        return response.choices[0].message.content.strip()
 
     except Exception as e:
-        logging.error(f"AI ERROR FULL: {repr(e)}")
-        return random.choice(FALLBACK_PHRASES)
+        logging.error(f"AI ERROR: {repr(e)}")
+        return random.choice(FALLBACK)
 
 
 @dp.message()
@@ -122,27 +102,14 @@ async def chat(message: Message):
     user_id = message.from_user.id
     name = message.from_user.first_name
 
-    if user_id not in user_stats:
-        user_stats[user_id] = {"messages": 0}
-
-    user_stats[user_id]["messages"] += 1
-
-    # шанс ответа
-    if random.randint(1, 100) > 80:
+    if random.randint(1, 100) > 75:
         return
 
     reply = await generate_reply(user_id, message.text, name)
 
-    reply = f"{name}, {reply}"
-
-    # 😈 доп подкол
-    if random.randint(1, 100) < 30:
-        reply += "\n\nты вообще всегда такой? 😏"
-
-    await message.reply(reply)
+    await message.reply(f"{name}, {reply}")
 
 
-# 😈 авто чат
 async def auto_chat():
     while True:
         await asyncio.sleep(random.randint(300, 900))
@@ -150,8 +117,7 @@ async def auto_chat():
         phrases = [
             "чё притихли… 😈",
             "мне скучно уже",
-            "кто живой?",
-            "я тут одна вообще или как? 😏",
+            "кто тут самый интересный?",
         ]
 
         try:
