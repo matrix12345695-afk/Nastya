@@ -9,10 +9,10 @@ from openai import OpenAI
 
 # 🔐 ENV
 TOKEN = os.getenv("TOKEN")
-OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not TOKEN or not OPENROUTER_KEY:
-    raise ValueError("❌ TOKEN или OPENROUTER_KEY не найдены!")
+if not TOKEN or not OPENAI_API_KEY:
+    raise ValueError("❌ TOKEN или OPENAI_API_KEY не найдены!")
 
 CHAT_ID = -1002447821457
 
@@ -21,46 +21,35 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=OPENROUTER_KEY,
-)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 user_memory = {}
 user_stats = {}
 
-# 😈 ХАРАКТЕР
 SYSTEM_PROMPT = """
-Ты живая девушка по имени Настя.
+Ты Настя.
 
 Характер:
-- уверенная
 - дерзкая
-- иногда подкалываешь
-- можешь чуть пофлиртовать
-- иногда ленишься отвечать нормально
+- уверенная
+- иногда флиртуешь
+- иногда игноришь
+- можешь подколоть
 
-Стиль:
-- как человек, не как бот
-- коротко + иногда развернуто
-- иногда добавляешь эмоции 😏😈
-
-НЕ:
-- не пиши как нейросеть
-- не будь скучной
+Пиши как живой человек.
+Не будь скучной.
 """
 
-# 🎭 fallback если AI умер
 FALLBACK_PHRASES = [
-    "мне лень сейчас думать… скажи ещё раз 😒",
-    "ты серьёзно сейчас это спросил? 😏",
-    "я зависла… попробуй ещё раз 😈",
-    "мм… звучит подозрительно 😏",
+    "я сейчас не в настроении отвечать 😏",
+    "подожди… я думаю 😈",
+    "ты меня немного грузишь сейчас 😒",
 ]
+
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    await message.answer("ну привет… ты ко мне или просто мимо проходил? 😏")
+    await message.answer("ну привет… неужели решил написать? 😏")
 
 
 async def generate_reply(user_id, text):
@@ -69,7 +58,7 @@ async def generate_reply(user_id, text):
         history.append({"role": "user", "content": text})
 
         response = client.chat.completions.create(
-            model="openchat/openchat-7b",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 *history[-10:]
@@ -86,7 +75,7 @@ async def generate_reply(user_id, text):
         return reply
 
     except Exception as e:
-        logging.error(f"AI ERROR: {e}")
+        logging.error(f"AI ERROR FULL: {repr(e)}")
         return random.choice(FALLBACK_PHRASES)
 
 
@@ -102,32 +91,28 @@ async def chat(message: Message):
 
     user_stats[user_id]["messages"] += 1
 
-    # 🎯 шанс ответа (умнее)
-    if random.randint(1, 100) > 75:
+    # шанс ответа
+    if random.randint(1, 100) > 80:
         return
 
     reply = await generate_reply(user_id, message.text)
 
-    # 🎭 имя + стиль
     reply = f"{message.from_user.first_name}, {reply}"
 
-    # 🔥 иногда подкол
-    if random.randint(1, 100) < 35:
-        reply += "\n\nи вообще… ты странный 😏"
+    if random.randint(1, 100) < 30:
+        reply += "\n\nты вообще всегда такой? 😏"
 
     await message.reply(reply)
 
 
-# 😈 авто чат
 async def auto_chat():
     while True:
         await asyncio.sleep(random.randint(300, 900))
 
         phrases = [
-            "чё притихли… я вообще-то тут 😈",
-            "мне скучно, давайте движ 😏",
-            "кто живой вообще?",
-            "я уже начинаю думать, что вы боты 🤨",
+            "чё притихли… 😈",
+            "мне скучно уже",
+            "кто живой?",
         ]
 
         try:
