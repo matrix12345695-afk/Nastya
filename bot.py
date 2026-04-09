@@ -14,8 +14,8 @@ OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
 if not TOKEN or not OPENROUTER_KEY:
     raise ValueError("❌ TOKEN или OPENROUTER_KEY не найдены!")
 
-# ⚠️ ВАЖНО: пока ставим None (чтобы не крашился)
-CHAT_ID = None
+# ✅ ВСТАВЬ СЮДА СВОЙ CHAT_ID (ты уже получил его)
+CHAT_ID = -1002447821457
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,27 +35,31 @@ user_memory = {}
 user_stats = {}
 
 SYSTEM_PROMPT = """
-Ты живая, умная девушка в чате.
+Ты живая, уверенная, немного дерзкая девушка.
 
 Ты:
-- говоришь естественно
-- отвечаешь осмысленно
-- понимаешь контекст
+- говоришь как реальный человек
+- понимаешь смысл
+- иногда подкалываешь
 - иногда задаёшь вопросы
 
-Не будь ботом.
+НЕ:
+- не пиши тупые короткие ответы
+- не говори как бот
+
+Будь естественной.
 """
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    await message.answer("Ну привет... давай поговорим нормально 😏")
+    await message.answer("Ну привет... давай пообщаемся 😏")
 
 
-# 🔥 ПРОВЕРКА AI
+# 🔥 ПРОВЕРКА AI (теперь бесплатная модель)
 async def check_ai():
     try:
         client.chat.completions.create(
-            model="mistralai/mixtral-8x7b",
+            model="google/gemma-7b-it:free",
             messages=[{"role": "user", "content": "ок"}],
             max_tokens=5,
         )
@@ -65,31 +69,21 @@ async def check_ai():
         return False
 
 
-# 🔥 AI
+# 🔥 ОСНОВНОЙ AI (БЕСПЛАТНЫЙ)
 async def generate_reply(user_id, text):
     try:
         history = user_memory.get(user_id, [])
         history.append({"role": "user", "content": text})
 
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            *history[-10:]
-        ]
-
-        try:
-            response = client.chat.completions.create(
-                model="meta-llama/llama-3-70b-instruct",
-                messages=messages,
-                temperature=0.9,
-                max_tokens=400,
-            )
-        except:
-            response = client.chat.completions.create(
-                model="mistralai/mixtral-8x7b",
-                messages=messages,
-                temperature=0.9,
-                max_tokens=250,
-            )
+        response = client.chat.completions.create(
+            model="google/gemma-7b-it:free",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                *history[-10:]
+            ],
+            temperature=0.9,
+            max_tokens=250,
+        )
 
         reply = response.choices[0].message.content.strip()
 
@@ -100,7 +94,7 @@ async def generate_reply(user_id, text):
 
     except Exception as e:
         logging.error(f"GPT ERROR: {e}")
-        return "я зависла… но сейчас вернусь 😒"
+        return "мне лень думать… скажи ещё раз 😒"
 
 
 @dp.message()
@@ -108,7 +102,6 @@ async def chat(message: Message):
     if not message.text:
         return
 
-    # 🔥 выводим CHAT_ID в лог (ОЧЕНЬ ВАЖНО)
     logging.info(f"CHAT ID: {message.chat.id}")
 
     user_id = message.from_user.id
@@ -118,25 +111,28 @@ async def chat(message: Message):
 
     user_stats[user_id]["messages"] += 1
 
+    # 🔥 80% отвечает
     if random.randint(1, 100) > 80:
         return
 
     reply = await generate_reply(user_id, message.text)
+
     reply = f"{message.from_user.first_name}, {reply}"
+
+    # 🔥 иногда добавляем живость
+    if "?" not in reply and random.randint(1, 100) < 40:
+        reply += "\n\nи вообще… ты это серьёзно сейчас?"
 
     await message.reply(reply)
 
 
-# 😈 авто-чат (без краша)
+# 😈 авто-чат
 async def auto_chat():
     while True:
-        await asyncio.sleep(600)
-
-        if not CHAT_ID:
-            continue
+        await asyncio.sleep(random.randint(300, 900))
 
         try:
-            await bot.send_message(CHAT_ID, "что-то тихо стало… вымерли?")
+            await bot.send_message(CHAT_ID, "чё притихли… мне уже скучно 😏")
         except Exception as e:
             logging.error(f"AUTO CHAT ERROR: {e}")
 
