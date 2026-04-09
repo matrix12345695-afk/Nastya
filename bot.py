@@ -1,17 +1,21 @@
 import asyncio
 import random
 import logging
+import os
 from aiogram import Bot, Dispatcher
 from aiogram.types import Message
 from aiogram.filters import CommandStart
 from openai import OpenAI
 
-import os
-
+# 🔐 ENV
 TOKEN = os.getenv("TOKEN")
 OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
 
-CHAT_ID = -2447821457
+if not TOKEN or not OPENROUTER_KEY:
+    raise ValueError("❌ TOKEN или OPENROUTER_KEY не найдены!")
+
+# ⚠️ ВАЖНО: пока ставим None (чтобы не крашился)
+CHAT_ID = None
 
 logging.basicConfig(level=logging.INFO)
 
@@ -27,36 +31,24 @@ client = OpenAI(
     }
 )
 
-# 🧠 ПАМЯТЬ
 user_memory = {}
-
-# 📊 АКТИВНОСТЬ
 user_stats = {}
 
-# 🔥 НОВЫЙ ПРОМПТ (ключ)
 SYSTEM_PROMPT = """
 Ты живая, умная девушка в чате.
 
 Ты:
-- говоришь естественно, как человек
-- отвечаешь развернуто, но без воды
-- понимаешь смысл, а не просто реагируешь
-- иногда задаёшь встречные вопросы
-- можешь слегка подколоть, но по делу
+- говоришь естественно
+- отвечаешь осмысленно
+- понимаешь контекст
+- иногда задаёшь вопросы
 
-Важно:
-- не пиши короткие тупые ответы
-- не используй шаблоны
-- не повторяйся
-- не веди себя как бот
-
-Твоя цель:
-сделать диалог живым и интересным, как будто ты реальный человек.
+Не будь ботом.
 """
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    await message.answer("Ну привет... давай нормально поговорим 😏")
+    await message.answer("Ну привет... давай поговорим нормально 😏")
 
 
 # 🔥 ПРОВЕРКА AI
@@ -64,16 +56,16 @@ async def check_ai():
     try:
         client.chat.completions.create(
             model="mistralai/mixtral-8x7b",
-            messages=[{"role": "user", "content": "Ответь: ок"}],
+            messages=[{"role": "user", "content": "ок"}],
             max_tokens=5,
         )
         return True
     except Exception as e:
-        logging.error(f"AI CHECK ERROR: {e}")
+        logging.error(f"AI ERROR: {e}")
         return False
 
 
-# 🔥 УМНЫЙ AI С FALLBACK
+# 🔥 AI
 async def generate_reply(user_id, text):
     try:
         history = user_memory.get(user_id, [])
@@ -81,25 +73,22 @@ async def generate_reply(user_id, text):
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "system", "content": "Сначала пойми смысл сообщения, потом ответь нормально."},
-            *history[-12:]
+            *history[-10:]
         ]
 
         try:
-            # 🔥 основная модель (умная)
             response = client.chat.completions.create(
                 model="meta-llama/llama-3-70b-instruct",
                 messages=messages,
                 temperature=0.9,
-                max_tokens=500,
+                max_tokens=400,
             )
         except:
-            # 💥 fallback (стабильная)
             response = client.chat.completions.create(
                 model="mistralai/mixtral-8x7b",
                 messages=messages,
                 temperature=0.9,
-                max_tokens=300,
+                max_tokens=250,
             )
 
         reply = response.choices[0].message.content.strip()
@@ -107,26 +96,11 @@ async def generate_reply(user_id, text):
         history.append({"role": "assistant", "content": reply})
         user_memory[user_id] = history
 
-        # женский род
-        reply = reply.replace("я сказал", "я сказала")
-        reply = reply.replace("я думал", "я думала")
-
-        # 🔥 добавляем “живость”
-        if "?" not in reply and random.randint(1, 100) < 40:
-            reply += "\n\nи вообще… ты это серьёзно сейчас или просто спросил?"
-
         return reply
 
     except Exception as e:
         logging.error(f"GPT ERROR: {e}")
-        return "я щас подвисла… но не надолго 😒"
-
-
-# 🎯 цель
-def get_target_user():
-    if not user_stats:
-        return None
-    return max(user_stats, key=lambda x: user_stats[x]["messages"])
+        return "я зависла… но сейчас вернусь 😒"
 
 
 @dp.message()
@@ -134,63 +108,37 @@ async def chat(message: Message):
     if not message.text:
         return
 
+    # 🔥 выводим CHAT_ID в лог (ОЧЕНЬ ВАЖНО)
+    logging.info(f"CHAT ID: {message.chat.id}")
+
     user_id = message.from_user.id
 
     if user_id not in user_stats:
         user_stats[user_id] = {"messages": 0}
 
     user_stats[user_id]["messages"] += 1
-    activity = user_stats[user_id]["messages"]
 
-    chance = 80 if activity < 5 else 95
-
-    if random.randint(1, 100) > chance:
+    if random.randint(1, 100) > 80:
         return
 
-    username = message.from_user.first_name
-
     reply = await generate_reply(user_id, message.text)
-    reply = f"{username}, {reply}"
-
-    target_id = get_target_user()
-    if target_id == user_id and random.randint(1, 100) < 30:
-        reply += "\n\nты слишком часто пишешь… я уже начинаю запоминать 😏"
+    reply = f"{message.from_user.first_name}, {reply}"
 
     await message.reply(reply)
 
 
-# 😈 авто-чат
+# 😈 авто-чат (без краша)
 async def auto_chat():
     while True:
-        await asyncio.sleep(random.randint(300, 900))
+        await asyncio.sleep(600)
 
-        phrases = [
-            "мне кажется тут кто-то думает, но не до конца 😏",
-            "вы вообще разговаривать умеете или просто пишете?",
-            "чё так тихо, я одна тут живая?",
-            "кто-нибудь скажет что-то нормальное наконец?"
-        ]
+        if not CHAT_ID:
+            continue
 
         try:
-            await bot.send_message(CHAT_ID, random.choice(phrases))
+            await bot.send_message(CHAT_ID, "что-то тихо стало… вымерли?")
         except Exception as e:
             logging.error(f"AUTO CHAT ERROR: {e}")
-
-
-# 🔥 статус AI
-async def ai_status_notify():
-    while True:
-        await asyncio.sleep(1800)
-
-        status = await check_ai()
-
-        try:
-            if status:
-                await bot.send_message(CHAT_ID, "🟢 я тут, всё думаю 😏")
-            else:
-                await bot.send_message(CHAT_ID, "🔴 я временно туплю… подождите 😒")
-        except Exception as e:
-            logging.error(f"STATUS ERROR: {e}")
 
 
 async def main():
@@ -201,18 +149,14 @@ async def main():
     status = await check_ai()
 
     if status:
-        await bot.send_message(CHAT_ID, "🟢 я вернулась, давайте нормально поговорим 😏")
+        logging.info("🟢 AI OK")
     else:
-        await bot.send_message(CHAT_ID, "🔴 я тут, но мозги что-то не грузятся 😒")
+        logging.error("🔴 AI ERROR")
 
     asyncio.create_task(auto_chat())
-    asyncio.create_task(ai_status_notify())
 
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-    @dp.message()
-async def debug(message: Message):
-    print("CHAT ID:", message.chat.id)
